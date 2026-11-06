@@ -273,27 +273,107 @@ function iniciarGaleria() {
   const galeria = document.getElementById("galeria");
   if (!galeria) return;
   const slides = Array.from(galeria.querySelectorAll(".galeria-slide"));
+  const n = slides.length;
+  const DURACAO = 380;
   let atual = 0;
+  let largura = galeria.clientWidth;
+  let x0 = 0;
+  let dx = 0;
+  let arrastando = false;
+  let arrastou = false;
+  let ocupado = false;
+  const mod = i => (i + n) % n;
 
-  function ir(i) {
-    slides[atual].classList.remove("ativo");
-    atual = (i + slides.length) % slides.length;
-    slides[atual].classList.add("ativo");
+  function pos(el, px, animar) {
+    el.style.transition = animar && !REDUZIR_MOVIMENTO ? `transform ${DURACAO}ms cubic-bezier(.22, .7, .2, 1)` : "none";
+    el.style.transform = `translate3d(${px}px, 0, 0)`;
   }
+
+  function reposicionar() {
+    largura = galeria.clientWidth;
+    slides.forEach((s, i) => {
+      s.classList.toggle("ativo", i === atual);
+      s.style.visibility = i === atual ? "visible" : "hidden";
+      pos(s, i === atual ? 0 : largura, false);
+    });
+  }
+
+  function deslizar(dir) {
+    if (ocupado || n < 2) return;
+    ocupado = true;
+    const prox = mod(atual + dir);
+    const jaPosicionado = slides[prox].style.visibility === "visible";
+    if (!jaPosicionado) {
+      slides[prox].style.visibility = "visible";
+      pos(slides[prox], dir * largura, false);
+      slides[prox].getBoundingClientRect();
+    }
+    pos(slides[atual], -dir * largura, true);
+    pos(slides[prox], 0, true);
+    setTimeout(() => {
+      atual = prox;
+      ocupado = false;
+      reposicionar();
+    }, REDUZIR_MOVIMENTO ? 0 : DURACAO + 20);
+  }
+
+  function voltar(dir) {
+    ocupado = true;
+    const vizinho = mod(atual + dir);
+    pos(slides[atual], 0, true);
+    pos(slides[vizinho], dir * largura, true);
+    setTimeout(() => {
+      ocupado = false;
+      reposicionar();
+    }, REDUZIR_MOVIMENTO ? 0 : DURACAO + 20);
+  }
+
+  reposicionar();
+  if (n < 2) return;
 
   const ant = galeria.querySelector(".ant");
   const prox = galeria.querySelector(".prox");
-  if (ant) ant.addEventListener("click", () => ir(atual - 1));
-  if (prox) prox.addEventListener("click", () => ir(atual + 1));
+  if (ant) ant.addEventListener("click", () => { if (!arrastou) deslizar(-1); });
+  if (prox) prox.addEventListener("click", () => { if (!arrastou) deslizar(1); });
 
-  let x0 = null;
-  galeria.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
-  galeria.addEventListener("touchend", e => {
-    if (x0 === null || slides.length < 2) return;
-    const dx = e.changedTouches[0].clientX - x0;
-    if (Math.abs(dx) > 40) ir(dx < 0 ? atual + 1 : atual - 1);
-    x0 = null;
+  galeria.addEventListener("pointerdown", e => {
+    if (ocupado) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    arrastando = true;
+    arrastou = false;
+    x0 = e.clientX;
+    dx = 0;
+    largura = galeria.clientWidth;
   });
+
+  galeria.addEventListener("pointermove", e => {
+    if (!arrastando) return;
+    dx = e.clientX - x0;
+    if (Math.abs(dx) < 3) return;
+    arrastou = true;
+    const dir = dx < 0 ? 1 : -1;
+    const vizinho = mod(atual + dir);
+    slides.forEach((s, i) => { if (i !== atual && i !== vizinho) s.style.visibility = "hidden"; });
+    slides[vizinho].style.visibility = "visible";
+    pos(slides[atual], dx, false);
+    pos(slides[vizinho], dir * largura + dx, false);
+  });
+
+  function soltar() {
+    if (!arrastando) return;
+    arrastando = false;
+    if (Math.abs(dx) < 3) return;
+    const dir = dx < 0 ? 1 : -1;
+    if (Math.abs(dx) > largura * 0.18) deslizar(dir);
+    else voltar(dir);
+  }
+  galeria.addEventListener("pointerup", soltar);
+  galeria.addEventListener("pointercancel", soltar);
+  galeria.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") soltar(); });
+
+  if ("ResizeObserver" in window) {
+    new ResizeObserver(() => { if (!arrastando && !ocupado) reposicionar(); }).observe(galeria);
+  }
 }
 
 const modalVaga = document.getElementById("modalVaga");
