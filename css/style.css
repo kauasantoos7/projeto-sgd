@@ -862,3 +862,7 @@ body.animar-entrada .hero-img { animation: aparecer 1.1s .1s ease backwards; }
   .menu a:hover::after, .menu a:focus-visible::after, .menu a:active::after { transform: scaleX(1); }
   .menu a:active { background: #fdf3f5; }
 }
+
+.galeria-slide { opacity: 1; transition: none; will-change: transform; }
+.galeria-slide img { -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.galeria { user-select: none; -webkit-user-select: none; }
